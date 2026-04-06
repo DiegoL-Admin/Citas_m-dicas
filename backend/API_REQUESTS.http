@@ -1,0 +1,126 @@
+### Variables
+@baseUrl = http://localhost:5000/api
+
+### ============================================
+### PACIENTES
+### ============================================
+
+### Crear Paciente
+POST {{baseUrl}}/patients
+Content-Type: application/json
+
+{
+  "name": "Diego López",
+  "email": "diego@example.com",
+  "phone": "5551234567",
+  "age": 30,
+  "medicalHistory": "Ninguno"
+}
+
+### Obtener todos los pacientes
+GET {{baseUrl}}/patients
+
+### Obtener paciente por ID
+GET {{baseUrl}}/patients/PATIENT_ID_HERE
+
+### Actualizar paciente
+PUT {{baseUrl}}/patients/PATIENT_ID_HERE
+Content-Type: application/json
+
+{
+  "medicalHistory": "Hipertensión"
+}
+
+### Eliminar paciente
+DELETE {{baseUrl}}/patients/PATIENT_ID_HERE
+
+### ============================================
+### DOCTORES
+### ============================================
+
+### Crear Doctor
+POST {{baseUrl}}/doctors
+Content-Type: application/json
+
+{
+  "name": "Dr. Juan Martínez",
+  "specialty": "Cardiología",
+  "email": "juan.martinez@hospital.com",
+  "phone": "5559876543",
+  "scheduleStart": "08:00",
+  "scheduleEnd": "17:00",
+  "daysAvailable": [0, 1, 2, 3, 4]
+}
+
+### Obtener todos los doctores
+GET {{baseUrl}}/doctors
+
+### Obtener doctores por especialidad
+GET {{baseUrl}}/doctors?specialty=Cardiología
+
+### Obtener doctor por ID
+GET {{baseUrl}}/doctors/DOCTOR_ID_HERE
+
+### Actualizar doctor
+PUT {{baseUrl}}/doctors/DOCTOR_ID_HERE
+Content-Type: application/json
+
+{
+  "phone": "5551234567"
+}
+
+### Eliminar doctor
+DELETE {{baseUrl}}/doctors/DOCTOR_ID_HERE
+
+### ============================================
+### CITAS MÉDICAS
+### ============================================
+
+### Crear Cita
+POST {{baseUrl}}/appointments
+Content-Type: application/json
+
+{
+  "patientId": "PATIENT_ID_HERE",
+  "doctorId": "DOCTOR_ID_HERE",
+  "dateTime": "2024-01-20T10:30:00Z",
+  "reason": "Chequeo general"
+}
+
+### Obtener todas las citas
+GET {{baseUrl}}/appointments
+
+### Obtener citas por estado
+GET {{baseUrl}}/appointments?status=scheduled
+
+### Obtener citas por rango de fechas
+GET {{baseUrl}}/appointments?startDate=2024-01-01&endDate=2024-12-31
+
+### Obtener citas de un paciente
+GET {{baseUrl}}/appointments/patient/PATIENT_ID_HERE
+
+### Obtener citas de un doctor
+GET {{baseUrl}}/appointments/doctor/DOCTOR_ID_HERE
+
+### Verificar disponibilidad del doctor
+GET {{baseUrl}}/appointments/availability?doctorId=DOCTOR_ID_HERE&date=2024-01-20
+
+### Actualizar cita
+PUT {{baseUrl}}/appointments/APPOINTMENT_ID_HERE
+Content-Type: application/json
+
+{
+  "dateTime": "2024-01-21T14:00:00Z",
+  "reason": "Chequeo completo",
+  "notes": "Llevar análisis previos"
+}
+
+### Cancelar cita (DELETE)
+DELETE {{baseUrl}}/appointments/APPOINTMENT_ID_HERE
+
+### ============================================
+### INFORMACIÓN
+### ============================================
+
+### API Info
+GET {{baseUrl}}

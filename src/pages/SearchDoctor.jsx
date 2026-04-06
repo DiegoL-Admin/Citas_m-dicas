@@ -1,29 +1,49 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { colors, radius, shadow } from '../theme';
 import { PageHeader, Card, Badge, Avatar, Button, SectionTitle } from '../components/UI';
+import { doctorAPI } from '../services/api';
 
-const specialties = ['Todos', 'Cardiología', 'Dermatología', 'Pediatría', 'Neurología', 'Ginecología', 'Traumatología', 'Psicología', 'Oftalmología'];
+const SPECIALTIES = ['Todos', 'Cardiología', 'Dermatología', 'Pediatría', 'Neurología', 'Ginecología', 'Traumatología', 'Neumología', 'Psicología'];
+const COLORS = ['#0CB7A6', '#CC33AA', '#F59E0B', colors.primary, '#22B85F', '#9355EF', '#ED3B3B', '#4A90E2'];
 
-const doctors = [
-  { id: 1, name: 'Dr. Carlos García', specialty: 'Cardiología', rating: 4.9, reviews: 312, exp: '15 años', available: 'Disponible', price: '$45', color: '#0CB7A6', initials: 'CG' },
-  { id: 2, name: 'Dra. María López', specialty: 'Dermatología', rating: 4.8, reviews: 198, exp: '10 años', available: 'Hoy 3:30 PM', price: '$55', color: '#CC33AA', initials: 'ML' },
-  { id: 3, name: 'Dr. Pedro Ruiz', specialty: 'Medicina General', rating: 4.7, reviews: 445, exp: '20 años', available: 'Mañana', price: '$30', color: '#F59E0B', initials: 'PR' },
-  { id: 4, name: 'Dra. Ana Castillo', specialty: 'Neurología', rating: 4.9, reviews: 87, exp: '12 años', available: 'Disponible', price: '$70', color: colors.primary, initials: 'AC' },
-  { id: 5, name: 'Dr. Marcos Vega', specialty: 'Pediatría', rating: 4.6, reviews: 521, exp: '18 años', available: 'Hoy 5:00 PM', price: '$40', color: '#22B85F', initials: 'MV' },
-  { id: 6, name: 'Dra. Laura Nieto', specialty: 'Ginecología', rating: 4.8, reviews: 267, exp: '14 años', available: 'Mañana', price: '$60', color: '#9355EF', initials: 'LN' },
-];
+const getInitials = (name) => {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase();
+};
+
+const getColor = (id) => {
+  return COLORS[id.charCodeAt(id.length - 1) % COLORS.length];
+};
 
 export default function SearchDoctor({ navigate }) {
   const [search, setSearch] = useState('');
   const [activeSpec, setActiveSpec] = useState('Todos');
+  const [doctors, setDoctors] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchDoctors();
+  }, [activeSpec]);
+
+  const fetchDoctors = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const specialty = activeSpec === 'Todos' ? null : activeSpec;
+      const response = await doctorAPI.getAll(specialty);
+      setDoctors(response.doctors || []);
+    } catch (err) {
+      setError(err.message || 'Error al cargar los doctores');
+      setDoctors([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filtered = doctors.filter(d => {
     const matchSearch = d.name.toLowerCase().includes(search.toLowerCase()) || d.specialty.toLowerCase().includes(search.toLowerCase());
-    const matchSpec = activeSpec === 'Todos' || d.specialty === activeSpec;
-    return matchSearch && matchSpec;
+    return matchSearch;
   });
-
-  const isAvailableNow = (avail) => avail === 'Disponible' || avail.includes('Hoy');
 
   return (
     <div>
@@ -51,7 +71,7 @@ export default function SearchDoctor({ navigate }) {
 
         {/* Specialty chips */}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-          {specialties.map(spec => (
+          {SPECIALTIES.map(spec => (
             <button
               key={spec}
               onClick={() => setActiveSpec(spec)}
@@ -83,54 +103,72 @@ export default function SearchDoctor({ navigate }) {
 
         {/* Results count */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: colors.text }}>{filtered.length} médicos encontrados</span>
-          <select style={{ border: `1px solid ${colors.border}`, borderRadius: 8, padding: '6px 12px', fontSize: 13, color: colors.textSub, fontFamily: 'inherit', background: colors.white }}>
-            <option>Ordenar: Relevancia</option>
-            <option>Mejor calificación</option>
-            <option>Menor precio</option>
-            <option>Disponibilidad</option>
-          </select>
+          <span style={{ fontSize: 14, fontWeight: 600, color: colors.text }}>
+            {loading ? 'Cargando...' : `${filtered.length} médicos encontrados`}
+          </span>
         </div>
+
+        {error && (
+          <div style={{
+            padding: 16,
+            marginBottom: 16,
+            background: '#FEE2E2',
+            color: '#DC2626',
+            borderRadius: 8,
+            fontSize: 13,
+            borderLeft: `3px solid #DC2626`,
+          }}>
+            {error}
+          </div>
+        )}
 
         {/* Doctor grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
-          {filtered.map(doc => (
-            <Card key={doc.id} style={{ padding: 20 }}>
-              <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-                <Avatar initials={doc.initials} color={doc.color} size={56} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
-                    <div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: colors.text }}>{doc.name}</div>
-                      <div style={{ fontSize: 12, color: colors.textSub, marginTop: 2 }}>{doc.specialty} · {doc.exp} exp.</div>
-                      <div style={{ fontSize: 12, color: colors.warning, fontWeight: 600, marginTop: 4 }}>
-                        ⭐ {doc.rating} ({doc.reviews} reseñas)
+        {!loading && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+            {filtered.map(doc => {
+              const initials = getInitials(doc.name);
+              const color = getColor(doc._id);
+              return (
+                <Card key={doc._id} style={{ padding: 20 }}>
+                  <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+                    <Avatar initials={initials} color={color} size={56} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+                        <div>
+                          <div style={{ fontSize: 15, fontWeight: 700, color: colors.text }}>{doc.name}</div>
+                          <div style={{ fontSize: 12, color: colors.textSub, marginTop: 2 }}>{doc.specialty}</div>
+                          <div style={{ fontSize: 12, color: colors.textSub, marginTop: 4 }}>📞 {doc.phone}</div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, gap: 10 }}>
+                        <Badge color={colors.accentLight} textColor={colors.accent}>
+                          🟢 Disponible
+                        </Badge>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <Button variant="outline" size="sm" onClick={() => navigate('doctorProfile')}>Ver perfil</Button>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => {
+                              localStorage.setItem('selectedDoctorId', doc._id);
+                              localStorage.setItem('selectedDoctorName', doc.name);
+                              localStorage.setItem('selectedDoctorSpecialty', doc.specialty);
+                              navigate('book');
+                            }}
+                          >
+                            Agendar
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: colors.text }}>{doc.price}</div>
-                      <div style={{ fontSize: 11, color: colors.textSub }}>por cita</div>
-                    </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, gap: 10 }}>
-                    <Badge
-                      color={isAvailableNow(doc.available) ? colors.accentLight : colors.primaryLight}
-                      textColor={isAvailableNow(doc.available) ? colors.accent : colors.primary}
-                    >
-                      {isAvailableNow(doc.available) ? '🟢' : '🔵'} {doc.available}
-                    </Badge>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <Button variant="outline" size="sm" onClick={() => navigate('doctorProfile')}>Ver perfil</Button>
-                      <Button variant="primary" size="sm" onClick={() => navigate('book')}>Agendar</Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
 
-        {filtered.length === 0 && (
+        {!loading && filtered.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 0', color: colors.textSub }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
             <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>No se encontraron médicos</div>

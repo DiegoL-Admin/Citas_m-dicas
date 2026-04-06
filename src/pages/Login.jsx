@@ -1,11 +1,61 @@
 import { useState } from 'react';
 import { colors, radius, shadow } from '../theme';
 import { Button, Input } from '../components/UI';
+import { authAPI, patientAPI } from '../services/api';
 
 export default function Login({ onLogin }) {
   const [tab, setTab] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [age, setAge] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setError('Por favor completa todos los campos');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      await authAPI.login(email, password);
+      onLogin();
+    } catch (err) {
+      setError(err.message || 'Error al iniciar sesión');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    if (!email || !password || !name || !phone || !age) {
+      setError('Por favor completa todos los campos');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      await authAPI.register({
+        name,
+        email,
+        phone,
+        age: parseInt(age),
+        medicalHistory: '',
+      });
+      onLogin();
+    } catch (err) {
+      setError(err.message || 'Error al registrarse');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: "'DM Sans', sans-serif" }}>
@@ -106,23 +156,77 @@ export default function Login({ onLogin }) {
             ))}
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-            <Input label="Correo electrónico" placeholder="correo@ejemplo.com" type="email" value={email} onChange={e => setEmail(e.target.value)} />
-            <Input label="Contraseña" placeholder="••••••••••" type="password" value={password} onChange={e => setPassword(e.target.value)} />
-          </div>
+          {error && (
+            <div style={{
+              padding: 12,
+              marginBottom: 16,
+              background: '#FEE2E2',
+              color: '#DC2626',
+              borderRadius: 8,
+              fontSize: 13,
+              borderLeft: `3px solid #DC2626`,
+            }}>
+              {error}
+            </div>
+          )}
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '16px 0 24px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: colors.textSub, cursor: 'pointer' }}>
-              <input type="checkbox" /> Recordarme
-            </label>
-            <button style={{ background: 'none', border: 'none', color: colors.primary, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-              ¿Olvidaste tu contraseña?
-            </button>
-          </div>
+          <form onSubmit={tab === 'login' ? handleLogin : handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {tab === 'register' && (
+              <>
+                <Input
+                  label="Nombre completo"
+                  placeholder="Tu nombre"
+                  type="text"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                />
+                <Input
+                  label="Teléfono"
+                  placeholder="1234567890"
+                  type="tel"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                />
+                <Input
+                  label="Edad"
+                  placeholder="30"
+                  type="number"
+                  value={age}
+                  onChange={e => setAge(e.target.value)}
+                />
+              </>
+            )}
 
-          <Button variant="primary" size="lg" fullWidth onClick={onLogin}>
-            {tab === 'login' ? 'Iniciar Sesión' : 'Crear Cuenta'}
-          </Button>
+            <Input
+              label="Correo electrónico"
+              placeholder="correo@ejemplo.com"
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+            />
+            <Input
+              label="Contraseña"
+              placeholder="••••••••••"
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+            />
+
+            {tab === 'login' && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '8px 0 16px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: colors.textSub, cursor: 'pointer' }}>
+                  <input type="checkbox" /> Recordarme
+                </label>
+                <button style={{ background: 'none', border: 'none', color: colors.primary, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </div>
+            )}
+
+            <Button variant="primary" size="lg" fullWidth disabled={loading}>
+              {loading ? 'Cargando...' : tab === 'login' ? 'Iniciar Sesión' : 'Crear Cuenta'}
+            </Button>
+          </form>
 
           {/* Divider */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '24px 0' }}>

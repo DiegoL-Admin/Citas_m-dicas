@@ -1,24 +1,78 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { colors, radius, shadow } from '../theme';
 import { PageHeader, Card, Badge, Avatar, Button, SectionTitle } from '../components/UI';
+import { appointmentAPI, authAPI } from '../services/api';
 
-const upcoming = [
-  { id: 1, doctor: 'Dr. Carlos García', specialty: 'Cardiología', date: 'Sáb 4 Abr 2026', time: '10:00 AM', location: 'Clínica Metropolitana', type: 'Presencial', color: '#0CB7A6', initials: 'CG', status: 'Confirmada' },
-  { id: 2, doctor: 'Dra. María López', specialty: 'Dermatología', date: 'Mar 8 Abr 2026', time: '3:30 PM', location: 'Videollamada', type: 'Teleconsulta', color: '#CC33AA', initials: 'ML', status: 'Pendiente' },
-];
+const COLORS = ['#0CB7A6', '#CC33AA', '#F59E0B', colors.primary, '#22B85F', '#9355EF', '#ED3B3B', '#4A90E2'];
 
-const completed = [
-  { id: 3, doctor: 'Dr. Pedro Ruiz', specialty: 'Medicina General', date: '15 Mar 2026', diagnosis: 'Control rutinario', color: '#F59E0B', initials: 'PR', rating: 5 },
-  { id: 4, doctor: 'Dra. Ana Castillo', specialty: 'Neurología', date: '2 Mar 2026', diagnosis: 'Cefalea tensional', color: colors.primary, initials: 'AC', rating: 5 },
-  { id: 5, doctor: 'Dr. Marcos Vega', specialty: 'Pediatría', date: '20 Feb 2026', diagnosis: 'Revisión general', color: '#22B85F', initials: 'MV', rating: 4 },
-  { id: 6, doctor: 'Dra. Laura Nieto', specialty: 'Ginecología', date: '5 Feb 2026', diagnosis: 'Control anual', color: '#9355EF', initials: 'LN', rating: 5 },
-  { id: 7, doctor: 'Dr. Carlos García', specialty: 'Cardiología', date: '10 Ene 2026', diagnosis: 'Seguimiento', color: '#0CB7A6', initials: 'CG', rating: 5 },
-];
+const getColor = (id) => {
+  return COLORS[id.charCodeAt(id.length - 1) % COLORS.length];
+};
 
-const TABS = ['Próximas (2)', 'Completadas (18)', 'Canceladas (4)'];
+const getInitials = (name) => {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase();
+};
+
+const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('es-ES', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+};
+
+const formatTime = (dateString) => {
+  const date = new Date(dateString);
+  return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+};
+
+const TABS = ['Próximas', 'Completadas', 'Canceladas'];
 
 export default function MyAppointments({ navigate }) {
   const [activeTab, setActiveTab] = useState(0);
+  const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchAppointments();
+  }, []);
+
+  const fetchAppointments = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const user = authAPI.getCurrentUser();
+      if (!user) {
+        navigate('login');
+        return;
+      }
+
+      const response = await appointmentAPI.getPatientAppointments(user.userId);
+      setAppointments(response.appointments || []);
+    } catch (err) {
+      setError(err.message || 'Error al cargar las citas');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getTabCount = (status) => {
+    return appointments.filter(apt => apt.status === status).length;
+  };
+
+  const handleCancel = async (appointmentId) => {
+    if (window.confirm('¿Estás seguro de que deseas cancelar esta cita?')) {
+      try {
+        await appointmentAPI.cancel(appointmentId);
+        fetchAppointments();
+      } catch (err) {
+        alert('Error al cancelar: ' + err.message);
+      }
+    }
+  };
+
+  const getFilteredAppointments = () => {
+    const statusMap = { 0: 'scheduled', 1: 'completed', 2: 'cancelled' };
+    return appointments.filter(apt => apt.status === statusMap[activeTab]);
+  };
 
   return (
     <div>
@@ -43,90 +97,144 @@ export default function MyAppointments({ navigate }) {
                 transition: 'all 0.15s',
               }}
             >
-              {tab}
+              {tab} ({getTabCount(['scheduled', 'completed', 'cancelled'][i])})
             </button>
           ))}
-          {/* Filter */}
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
-            {['Especialidad ▾', 'Mes ▾', 'Estado ▾'].map(f => (
-              <select key={f} style={{ border: `1px solid ${colors.border}`, borderRadius: 8, padding: '8px 12px', fontSize: 12, color: colors.textSub, fontFamily: 'inherit', background: colors.white }}>
-                <option>{f}</option>
-              </select>
-            ))}
-          </div>
         </div>
 
-        {activeTab === 0 && (
+        {error && (
+          <div style={{
+            padding: 16,
+            marginBottom: 16,
+            background: '#FEE2E2',
+            color: '#DC2626',
+            borderRadius: 8,
+            fontSize: 13,
+            borderLeft: `3px solid #DC2626`,
+          }}>
+            {error}
+          </div>
+        )}
+
+        {!loading && (
           <>
-            <SectionTitle>Próximas Citas</SectionTitle>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 32 }}>
-              {upcoming.map(appt => (
-                <Card key={appt.id} style={{ padding: 0, overflow: 'hidden' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '20px 24px' }}>
-                    <div style={{ width: 5, height: 80, background: appt.color, borderRadius: 2, flexShrink: 0, margin: '-20px 0 -20px -24px' }} />
-                    <Avatar initials={appt.initials} color={appt.color} size={52} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: colors.text }}>{appt.doctor}</div>
-                      <div style={{ fontSize: 12, color: colors.textSub }}>{appt.specialty} · {appt.type}</div>
-                      <div style={{ fontSize: 12, color: colors.textSub, marginTop: 4 }}>📅 {appt.date} · 🕐 {appt.time}</div>
-                      <div style={{ fontSize: 12, color: colors.textSub }}>📍 {appt.location}</div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
-                      <Badge
-                        color={appt.status === 'Confirmada' ? colors.accentLight : colors.primaryLight}
-                        textColor={appt.status === 'Confirmada' ? colors.accent : colors.primary}
-                      >{appt.status}</Badge>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        {appt.type === 'Teleconsulta' && (
-                          <Button variant="success" size="sm">Unirse 💻</Button>
-                        )}
-                        {appt.type === 'Presencial' && (
-                          <Button variant="primary" size="sm">Ver detalles</Button>
-                        )}
-                        <Button variant="ghost" size="sm">Reprogramar</Button>
-                        <Button variant="danger" size="sm">Cancelar</Button>
-                      </div>
-                    </div>
+            {activeTab === 0 && (
+              <>
+                <SectionTitle>Próximas Citas</SectionTitle>
+                {getFilteredAppointments().length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px 20px', color: colors.textSub }}>
+                    <div style={{ fontSize: 32, marginBottom: 12 }}>📅</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>No tienes citas próximas</div>
+                    <Button variant="primary" onClick={() => navigate('search')} style={{ marginTop: 16 }}>
+                      Agendar cita
+                    </Button>
                   </div>
-                </Card>
-              ))}
-            </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 32 }}>
+                    {getFilteredAppointments().map(appt => {
+                      const initials = getInitials(appt.doctorId.name);
+                      const color = getColor(appt._id);
+                      return (
+                        <Card key={appt._id} style={{ padding: 0, overflow: 'hidden' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '20px 24px' }}>
+                            <div style={{ width: 5, height: 80, background: color, borderRadius: 2, flexShrink: 0, margin: '-20px 0 -20px -24px' }} />
+                            <Avatar initials={initials} color={color} size={52} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 15, fontWeight: 700, color: colors.text }}>{appt.doctorId.name}</div>
+                              <div style={{ fontSize: 12, color: colors.textSub }}>{appt.doctorId.specialty}</div>
+                              <div style={{ fontSize: 12, color: colors.textSub, marginTop: 4 }}>
+                                📅 {formatDate(appt.dateTime)} · 🕐 {formatTime(appt.dateTime)}
+                              </div>
+                              <div style={{ fontSize: 12, color: colors.textSub }}>Motivo: {appt.reason}</div>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
+                              <Badge color={colors.accentLight} textColor={colors.accent}>Confirmada</Badge>
+                              <div style={{ display: 'flex', gap: 8 }}>
+                                <Button variant="ghost" size="sm">Reprogramar</Button>
+                                <Button variant="danger" size="sm" onClick={() => handleCancel(appt._id)}>
+                                  Cancelar
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+
+            {activeTab === 1 && (
+              <>
+                <SectionTitle>Historial de Consultas</SectionTitle>
+                {getFilteredAppointments().length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px 20px', color: colors.textSub }}>
+                    <div style={{ fontSize: 32, marginBottom: 12 }}>📋</div>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>No tienes citas completadas</div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {getFilteredAppointments().map(appt => {
+                      const initials = getInitials(appt.doctorId.name);
+                      const color = getColor(appt._id);
+                      return (
+                        <Card key={appt._id} style={{ padding: '16px 24px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                            <Avatar initials={initials} color={color} size={42} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 14, fontWeight: 700, color: colors.text }}>{appt.doctorId.name}</div>
+                              <div style={{ fontSize: 12, color: colors.textSub }}>{appt.doctorId.specialty}</div>
+                              <div style={{ fontSize: 12, color: colors.textSub }}>Motivo: {appt.reason}</div>
+                            </div>
+                            <div style={{ fontSize: 12, color: colors.textSub, marginRight: 16 }}>{formatDate(appt.dateTime)}</div>
+                            <Badge color={colors.accentLight} textColor={colors.accent}>Completada</Badge>
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+
+            {activeTab === 2 && (
+              <>
+                <SectionTitle>Citas Canceladas</SectionTitle>
+                {getFilteredAppointments().length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px 20px', color: colors.textSub }}>
+                    <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>No tienes citas canceladas</div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {getFilteredAppointments().map(appt => {
+                      const initials = getInitials(appt.doctorId.name);
+                      const color = getColor(appt._id);
+                      return (
+                        <Card key={appt._id} style={{ padding: '16px 24px', opacity: 0.7 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                            <Avatar initials={initials} color={color} size={42} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 14, fontWeight: 700, color: colors.text }}>{appt.doctorId.name}</div>
+                              <div style={{ fontSize: 12, color: colors.textSub }}>{appt.doctorId.specialty}</div>
+                            </div>
+                            <div style={{ fontSize: 12, color: colors.textSub, marginRight: 16 }}>{formatDate(appt.dateTime)}</div>
+                            <Badge color='#FEE2E2' textColor='#DC2626'>Cancelada</Badge>
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
           </>
         )}
 
-        {activeTab === 1 && (
-          <>
-            <SectionTitle>Historial de Consultas</SectionTitle>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {completed.map(appt => (
-                <Card key={appt.id} style={{ padding: '16px 24px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <Avatar initials={appt.initials} color={appt.color} size={42} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: colors.text }}>{appt.doctor}</div>
-                      <div style={{ fontSize: 12, color: colors.textSub }}>{appt.specialty}</div>
-                      <div style={{ fontSize: 12, color: colors.textSub }}>Diagnóstico: {appt.diagnosis}</div>
-                    </div>
-                    <div style={{ fontSize: 12, color: colors.textSub, marginRight: 16 }}>{appt.date}</div>
-                    <div style={{ fontSize: 13, color: colors.warning }}>{'⭐'.repeat(appt.rating)}</div>
-                    <Badge color={colors.accentLight} textColor={colors.accent}>Completada</Badge>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <Button variant="outline" size="sm" onClick={() => navigate('doctorProfile')}>Ver detalle</Button>
-                      <Button variant="ghost" size="sm">★ Calificar</Button>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </>
-        )}
-
-        {activeTab === 2 && (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: colors.textSub }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>❌</div>
-            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>4 citas canceladas</div>
-            <div style={{ fontSize: 13, marginBottom: 24 }}>Estas citas fueron canceladas por ti o por el médico</div>
-            <Button variant="primary" onClick={() => navigate('book')}>Reagendar una cita</Button>
+        {loading && (
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: colors.textSub }}>
+            <div style={{ fontSize: 14 }}>Cargando citas...</div>
           </div>
         )}
       </div>
